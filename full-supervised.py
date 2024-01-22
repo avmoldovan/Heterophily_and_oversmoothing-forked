@@ -267,7 +267,7 @@ acc_list = []
 acc_deg_mean = np.zeros((args.n_groups))
 h_deg_mean = np.zeros((args.n_groups))
 h_deg_ori_mean = np.zeros((args.n_groups))
-for i in range(10):
+for i in range(1):
     datastr = args.data
     splitstr = 'splits/'+args.data+'_split_0.6_0.2_'+str(i)+'.npz'
     acc, acc_deg, h_deg, h_deg_ori = train(datastr,splitstr)
