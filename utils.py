@@ -8,7 +8,7 @@ import networkx as nx
 import json
 from networkx.readwrite import json_graph
 import pdb
-from torch_sparse import coalesce
+#from torch_sparse import coalesce
 sys.setrecursionlimit(99999)
 
 def accuracy(output, labels):
@@ -53,7 +53,7 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx, model_type):
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     if model_type=='GPRGNN':
-        edge_index, _ = coalesce(indices, None, shape[0], shape[1])
+        edge_index, _ = indices.coalesce()#coalesce(indices, None, shape[0], shape[1])
         return edge_index
     else:
         return torch.sparse.FloatTensor(indices, values, shape)
