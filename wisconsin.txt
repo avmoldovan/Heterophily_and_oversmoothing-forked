@@ -571,3 +571,4 @@ Epoch:0568 train loss:0.283 acc:94.17 | val loss:0.636 acc:73.75
 Train cost: 168.3531s
 Test acc.:58.82
 Test std.:0.00
+

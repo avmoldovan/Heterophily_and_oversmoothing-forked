@@ -130,12 +130,12 @@ class GCNII(nn.Module):
         layer_inner = F.dropout(layer_inner, self.dropout, training=self.training)
         layer_inner = self.fcs[-1](layer_inner)
 
-        # # node degrees
+        # node degrees
         # degrees = adj.sum(dim=1)
         #
         # # Find indices of top 100 nodes with highest degrees
         # _, min_nodes = torch.topk(degrees.values(), int(adj.size(0)/80), largest=False)
-        # _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/995), largest=True)
+        # _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/600), largest=True)
         #
         # # # Extract the submatrix of adj corresponding to the top nodes
         # # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
@@ -151,7 +151,7 @@ class GCNII(nn.Module):
         #         # for i, xi in enumerate(xi_detached):
         #         teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
         #         # try to update support only for nodes with connections that have smallest feature length
-        #         layer_inner[node] += 0.9*np.abs(teitem)
+        #         layer_inner[node] += (np.abs(teitem))
         #
         # teitem = 0.0
         # connected_pairs = []
@@ -166,7 +166,7 @@ class GCNII(nn.Module):
         #         # for i, xi in enumerate(xi_detached):
         #         teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
         #         # try to update support only for nodes with connections that have smallest feature length
-        #         layer_inner[node] -= 0.9*np.abs(teitem)
+        #         layer_inner[node] -= (np.abs(teitem))
         #         # pair_dict[(node.item(), cn.item())] = teitem
         #         # tes.append(teitem)  # * float(i+1))
         #         #                detached = torch.tensor(tes).to(device).to(torch.float32)
