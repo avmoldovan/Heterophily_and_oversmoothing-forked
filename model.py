@@ -134,8 +134,8 @@ class GCNII(nn.Module):
         degrees = adj.sum(dim=1)
 
         # Find indices of top 100 nodes with highest degrees
-        _, min_nodes = torch.topk(degrees.values(), int(adj.size(0)/80), largest=False)
-        _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/600), largest=True)
+        _, min_nodes = torch.topk(degrees.values(), int(adj.size(0)/80), largest=False) #600
+        _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/600), largest=True) #999
 
         # # Extract the submatrix of adj corresponding to the top nodes
         # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
