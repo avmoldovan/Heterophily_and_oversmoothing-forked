@@ -131,45 +131,45 @@ class GCNII(nn.Module):
         layer_inner = self.fcs[-1](layer_inner)
 
         # node degrees
-        degrees = adj.sum(dim=1)
-
-        # Find indices of top 100 nodes with highest degrees
-        _, min_nodes = torch.topk(degrees.values(), int(adj.size(0)/80), largest=False) #600
-        _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/600), largest=True) #999
-
-        # # Extract the submatrix of adj corresponding to the top nodes
-        # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
-        # # Find pairs of nodes in the top 100 that are connected
-        # connected_pairs = (sub_adj > 0).nonzero(as_tuple=False)
-
-        for node in max_nodes:
-            # Find nodes connected to the current top node
-            connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze()
-            for cn in connected_nodes:
-                tes = []
-                # xi_detached = x_i.t().detach().cpu().numpy()
-                # for i, xi in enumerate(xi_detached):
-                teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                # try to update support only for nodes with connections that have smallest feature length
-                layer_inner[node] += (np.abs(teitem))
-
-        teitem = 0.0
-        connected_pairs = []
-        connected_values = []
-        pair_dict = {}
-        for node in min_nodes:
-            # Find nodes connected to the current top node
-            connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze()
-            for cn in connected_nodes:
-                tes = []
-                # xi_detached = x_i.t().detach().cpu().numpy()
-                # for i, xi in enumerate(xi_detached):
-                teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                # try to update support only for nodes with connections that have smallest feature length
-                layer_inner[node] -= (np.abs(teitem))
-                # pair_dict[(node.item(), cn.item())] = teitem
-                # tes.append(teitem)  # * float(i+1))
-                #                detached = torch.tensor(tes).to(device).to(torch.float32)
+        # degrees = adj.sum(dim=1)
+        #
+        # # Find indices of top 100 nodes with highest degrees
+        # _, min_nodes = torch.topk(degrees.values(), int(adj.size(0)/80), largest=False) #600
+        # _, max_nodes = torch.topk(degrees.values(), int(adj.size(0)/600), largest=True) #999
+        #
+        # # # Extract the submatrix of adj corresponding to the top nodes
+        # # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
+        # # # Find pairs of nodes in the top 100 that are connected
+        # # connected_pairs = (sub_adj > 0).nonzero(as_tuple=False)
+        #
+        # for node in max_nodes:
+        #     # Find nodes connected to the current top node
+        #     connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze()
+        #     for cn in connected_nodes:
+        #         tes = []
+        #         # xi_detached = x_i.t().detach().cpu().numpy()
+        #         # for i, xi in enumerate(xi_detached):
+        #         teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+        #         # try to update support only for nodes with connections that have smallest feature length
+        #         layer_inner[node] += (np.abs(teitem))
+        #
+        # teitem = 0.0
+        # connected_pairs = []
+        # connected_values = []
+        # pair_dict = {}
+        # for node in min_nodes:
+        #     # Find nodes connected to the current top node
+        #     connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze()
+        #     for cn in connected_nodes:
+        #         tes = []
+        #         # xi_detached = x_i.t().detach().cpu().numpy()
+        #         # for i, xi in enumerate(xi_detached):
+        #         teitem = te.te_compute(layer_inner[node].detach().cpu().numpy(), layer_inner[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+        #         # try to update support only for nodes with connections that have smallest feature length
+        #         layer_inner[node] -= (np.abs(teitem))
+        #         # pair_dict[(node.item(), cn.item())] = teitem
+        #         # tes.append(teitem)  # * float(i+1))
+        #         #                detached = torch.tensor(tes).to(device).to(torch.float32)
 
 
 
