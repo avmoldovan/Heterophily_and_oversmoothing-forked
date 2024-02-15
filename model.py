@@ -756,20 +756,39 @@ class GGCNlayer(nn.Module):
         
             coeff = self.sftmax(self.coeff)
             scale = self.sftpls(self.scale)
-            result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh)
 
-            # degrees = adj.sum(dim=1)
-            #
-            # # Find indices of top 100 nodes with highest degrees
+
+            degrees = adj.sum(dim=1)
+
+            _, nodes = torch.topk(degrees, adj.size(0), largest=False)
+
+            sumte = 0.
+            with torch.no_grad():
+                for node in nodes:
+                    # Find nodes connected to the current top node
+                    connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+                    if connected_nodes.size == 1:
+                        sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                    else:
+                        for cn in connected_nodes:
+                            tes = []
+                            # xi_detached = x_i.t().detach().cpu().numpy()
+                            # for i, xi in enumerate(xi_detached):
+                            sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                            # try to update support only for nodes with connections that have smallest feature length
+                            #result[node] *= teitem
+            # Find indices of top 100 nodes with highest degrees
             # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
             # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
-            #
-            #
-            # # # Extract the submatrix of adj corresponding to the top nodes
-            # # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
-            # # # Find pairs of nodes in the top 100 that are connected
-            # # connected_pairs = (sub_adj > 0).nonzero(as_tuple=False)
-            #
+            #sumte += 1e-9
+
+            result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh-sumte)
+
+            # # Extract the submatrix of adj corresponding to the top nodes
+            # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
+            # # Find pairs of nodes in the top 100 that are connected
+            # connected_pairs = (sub_adj > 0).nonzero(as_tuple=False)
+
             # for node in max_nodes:
             #     # Find nodes connected to the current top node
             #     connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze()
@@ -889,10 +908,10 @@ class GGCN(nn.Module):
                     coeff = 1
                 layer_previous = coeff*layer_inner + layer_previous
             layer_inner = con(layer_previous,adj,self.degree_precompute)
-            if i == 0:
-                firstlayer = layer_inner
-            if i == (len(self.convs[1:]) - 1):
-                teitem = te.te_compute(firstlayer.view(-1).detach().cpu().numpy(), layer_inner.view(-1).detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+            # if i == 0:
+            #     firstlayer = layer_inner
+            # if i == (len(self.convs[1:]) - 1):
+            #     teitem = te.te_compute(firstlayer.view(-1).detach().cpu().numpy(), layer_inner.view(-1).detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
         # degrees = adj.sum(dim=1)
         #
         # # Find indices of top 100 nodes with highest degrees
