@@ -738,6 +738,9 @@ class GGCNlayer(nn.Module):
             sc = self.sftpls(sc)
 
         Wh = self.fcn(h)
+
+        #TODO: multiply Wh with 1.-TE even if TE is calculated only partially; needs a matrix and set only the values needed there
+        #TODO: of Spos and Sneg we need to assign TE somehow; there are only a few negative TE and same is Sneg
         if self.use_sign:
             prod = torch.matmul(Wh, torch.transpose(Wh, 0, 1))
             sq = torch.unsqueeze(torch.diag(prod),1)
@@ -782,7 +785,7 @@ class GGCNlayer(nn.Module):
             # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
             #sumte += 1e-9
 
-            result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh-sumte)
+            result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh+(1.-sumte))
 
             # # Extract the submatrix of adj corresponding to the top nodes
             # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
