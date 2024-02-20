@@ -731,6 +731,29 @@ class GGCNlayer(nn.Module):
         self.sftpls = nn.Softplus(beta=1)
 
 
+    def calc_te(self, adj, e, Wh):
+        degrees = adj.sum(dim=1)
+        _, nodes = torch.topk(degrees, adj.size(0), largest=False)
+        sumte = 0.
+        with torch.no_grad():
+            for node in nodes:
+                # Find nodes connected to the current top node
+                connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+                if connected_nodes.size == 1:
+                    sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                else:
+                    for cn in connected_nodes:
+                        tes = []
+                        # xi_detached = x_i.t().detach().cpu().numpy()
+                        # for i, xi in enumerate(xi_detached):
+                        sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                        # try to update support only for nodes with connections that have smallest feature length
+                        #result[node] *= teitem
+        # Find indices of top 100 nodes with highest degrees
+        # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
+        # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
+        sumte += 1e-9
+        return sumte
     
     def forward(self, h, adj, degree_precompute):
         if self.use_degree:
@@ -761,29 +784,7 @@ class GGCNlayer(nn.Module):
             scale = self.sftpls(self.scale)
 
 
-            degrees = adj.sum(dim=1)
-
-            _, nodes = torch.topk(degrees, adj.size(0), largest=False)
-
-            sumte = 0.
-            with torch.no_grad():
-                for node in nodes:
-                    # Find nodes connected to the current top node
-                    connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-                    if connected_nodes.size == 1:
-                        sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                    else:
-                        for cn in connected_nodes:
-                            tes = []
-                            # xi_detached = x_i.t().detach().cpu().numpy()
-                            # for i, xi in enumerate(xi_detached):
-                            sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                            # try to update support only for nodes with connections that have smallest feature length
-                            #result[node] *= teitem
-            # Find indices of top 100 nodes with highest degrees
-            # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
-            # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
-            #sumte += 1e-9
+            sumte = self.calc_te(adj, e, Wh)
 
             result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh+(1.-sumte))
 
