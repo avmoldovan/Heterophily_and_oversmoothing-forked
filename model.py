@@ -760,7 +760,7 @@ class GGCNlayer(nn.Module):
     def calc_te_matrix(self, adj: torch.tensor, e: torch.tensor, Wh: torch.tensor) -> torch.tensor:
         tematrix = torch.zeros(size=adj.shape, dtype=adj.dtype)
         degrees = adj.sum(dim=1)
-        _, nodes = torch.topk(degrees, int(adj.size(0)*.01), largest=False)
+        _, nodes = torch.topk(degrees, int(adj.size(0)*.03), largest=True)
         sumte = 0.
         tes = []
         with torch.no_grad():
@@ -801,19 +801,21 @@ class GGCNlayer(nn.Module):
             e = prod/torch.max(torch.sqrt(scaling),1e-9*torch.ones_like(scaling))
             e = e-torch.diag(torch.diag(e))
             if self.use_degree:
-
-                #telist = self.calc_te(adj, e, Wh)
-                temat = self.calc_te_matrix(adj, e, Wh)
-                Wh = Wh+temat.median()
-
                 attention = e*adj*sc
             else:
                 attention = e*adj
-            
+
+            #telist = self.calc_te(adj, e, Wh)
+            temat = self.calc_te_matrix(adj, e, Wh)
+            #Wh = Wh+temat.median()
+
             attention_pos = F.relu(attention)
             attention_neg = -F.relu(-attention)
             prop_pos = torch.matmul(attention_pos, Wh)
+            prop_pos = torch.matmul(F.relu(temat).to(prop_pos.device), prop_pos)
+
             prop_neg = torch.matmul(attention_neg, Wh)
+            prop_neg = torch.matmul(-F.relu(-temat).to(prop_neg.device), prop_neg)
         
             coeff = self.sftmax(self.coeff)
             scale = self.sftpls(self.scale)
