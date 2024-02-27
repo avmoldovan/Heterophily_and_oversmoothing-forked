@@ -730,61 +730,6 @@ class GGCNlayer(nn.Module):
         self.sftmax = nn.Softmax(dim=-1)
         self.sftpls = nn.Softplus(beta=1)
 
-
-    def calc_te(self, adj, e, Wh):
-        degrees = adj.sum(dim=1)
-        _, nodes = torch.topk(degrees, int(adj.size(0)*.05), largest=True)
-        sumte = 0.
-        tes = []
-        with torch.no_grad():
-            for node in nodes:
-                # Find nodes connected to the current top node
-                connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-                if connected_nodes.size == 1:
-                    sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                else:
-                    for cn in connected_nodes:
-                        # xi_detached = x_i.t().detach().cpu().numpy()
-                        # for i, xi in enumerate(xi_detached):
-                        teitem = te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                        tes.append(teitem)
-                        #sumte += teitem
-                        # try to update support only for nodes with connections that have smallest feature length
-                        #result[node] *= teitem
-        # Find indices of top 100 nodes with highest degrees
-        # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
-        # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
-        sumte += 1e-9
-        return tes
-
-    def calc_te_matrix(self, adj: torch.tensor, e: torch.tensor, Wh: torch.tensor) -> torch.tensor:
-        tematrix = torch.zeros(size=adj.shape, dtype=adj.dtype)
-        degrees = adj.sum(dim=1)
-        _, nodes = torch.topk(degrees, int(adj.size(0)*.03), largest=True)
-        sumte = 0.
-        tes = []
-        with torch.no_grad():
-            for node in nodes:
-                # Find nodes connected to the current top node
-                connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-                if connected_nodes.size == 1:
-                    sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                else:
-                    for cn in connected_nodes:
-                        # xi_detached = x_i.t().detach().cpu().numpy()
-                        # for i, xi in enumerate(xi_detached):
-                        teitem = te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
-                        tes.append(teitem)
-                        tematrix[node, cn] = teitem
-                        #sumte += teitem
-                        # try to update support only for nodes with connections that have smallest feature length
-                        #result[node] *= teitem
-        # Find indices of top 100 nodes with highest degrees
-        # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
-        # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
-        sumte += 1e-9
-        return tematrix
-    
     def forward(self, h, adj, degree_precompute):
         if self.use_degree:
             sc = self.deg_coeff[0]*degree_precompute+self.deg_coeff[1]
@@ -806,16 +751,16 @@ class GGCNlayer(nn.Module):
                 attention = e*adj
 
             #telist = self.calc_te(adj, e, Wh)
-            temat = self.calc_te_matrix(adj, e, Wh)
+            #temat = self.calc_te_matrix(adj, e, Wh)
             #Wh = Wh+temat.median()
 
             attention_pos = F.relu(attention)
             attention_neg = -F.relu(-attention)
             prop_pos = torch.matmul(attention_pos, Wh)
-            prop_pos = torch.matmul(F.relu(temat).to(prop_pos.device), prop_pos)
+            #prop_pos = torch.matmul(F.relu(temat).to(prop_pos.device), prop_pos)
 
             prop_neg = torch.matmul(attention_neg, Wh)
-            prop_neg = torch.matmul(-F.relu(-temat).to(prop_neg.device), prop_neg)
+            #prop_neg = torch.matmul(-F.relu(-temat).to(prop_neg.device), prop_neg)
         
             coeff = self.sftmax(self.coeff)
             scale = self.sftpls(self.scale)
@@ -867,7 +812,7 @@ class GGCNlayer(nn.Module):
                  
         return result
 
-        
+from utils import calc_te_matrix
         
 class GGCN(nn.Module):
     def __init__(self, nfeat, nlayers, nhidden, nclass, dropout, decay_rate, exponent, use_degree=True, use_sign=True, use_decay=True, use_sparse=False, scale_init=0.5, deg_intercept_init=0.5, use_bn=False, use_ln=False):
@@ -930,6 +875,14 @@ class GGCN(nn.Module):
         layer_previous = self.act_fn(layer_previous)
         layer_inner = self.convs[0](x, adj, self.degree_precompute)
 
+
+        #telist = self.calc_te(adj, e, Wh)
+
+        temat = calc_te_matrix(adj, x)
+        relute = F.relu(temat)
+        #lintemat = self.fcn(temat)
+        layer_inner = torch.matmul(1.-relute.to(layer_inner.device), layer_inner)
+
         firstlayer = None
         teitem = 0.0
         for i,con in enumerate(self.convs[1:]):
@@ -950,6 +903,10 @@ class GGCN(nn.Module):
             #     firstlayer = layer_inner
             # if i == (len(self.convs[1:]) - 1):
             #     teitem = te.te_compute(firstlayer.view(-1).detach().cpu().numpy(), layer_inner.view(-1).detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+
+
+        #Wh = Wh+temat.median()
+
         # degrees = adj.sum(dim=1)
         #
         # # Find indices of top 100 nodes with highest degrees

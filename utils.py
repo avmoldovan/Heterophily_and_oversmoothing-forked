@@ -8,8 +8,64 @@ import networkx as nx
 import json
 from networkx.readwrite import json_graph
 import pdb
+from PyIF import te_compute as te
 #from torch_sparse import coalesce
 sys.setrecursionlimit(99999)
+
+def calc_te(adj, e, Wh):
+    degrees = adj.sum(dim=1)
+    _, nodes = torch.topk(degrees, int(adj.size(0)*.05), largest=True)
+    sumte = 0.
+    tes = []
+    with torch.no_grad():
+        for node in nodes:
+            # Find nodes connected to the current top node
+            connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+            if connected_nodes.size == 1:
+                sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+            else:
+                for cn in connected_nodes:
+                    # xi_detached = x_i.t().detach().cpu().numpy()
+                    # for i, xi in enumerate(xi_detached):
+                    teitem = te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                    tes.append(teitem)
+                    #sumte += teitem
+                    # try to update support only for nodes with connections that have smallest feature length
+                    #result[node] *= teitem
+    # Find indices of top 100 nodes with highest degrees
+    # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
+    # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
+    sumte += 1e-9
+    return tes
+
+def calc_te_matrix(adj: torch.tensor, e: torch.tensor, Wh: torch.tensor = None) -> torch.tensor:
+    tematrix = torch.zeros(size=adj.shape, dtype=adj.dtype)
+    degrees = adj.sum(dim=1)
+    _, nodes = torch.topk(degrees, int(adj.size(0)*.05), largest=False)
+    sumte = 0.
+    tes = []
+    with torch.no_grad():
+        for node in nodes:
+            # Find nodes connected to the current top node
+            connected_nodes = ((adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+            if connected_nodes.size == 1:
+                sumte += te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+            else:
+                for cn in connected_nodes:
+                    # xi_detached = x_i.t().detach().cpu().numpy()
+                    # for i, xi in enumerate(xi_detached):
+                    teitem = te.te_compute(e[node].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                    tes.append(teitem)
+                    tematrix[node, cn] += teitem
+                    #sumte += teitem
+                    # try to update support only for nodes with connections that have smallest feature length
+                    #result[node] *= teitem
+    # Find indices of top 100 nodes with highest degrees
+    # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
+    # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
+    sumte += 1e-9
+    return tematrix
+
 
 def accuracy(output, labels):
     preds = output.max(1)[1].type_as(labels)
