@@ -12,6 +12,44 @@ from PyIF import te_compute as te
 #from torch_sparse import coalesce
 sys.setrecursionlimit(99999)
 
+import torch
+from torch_geometric.utils import to_undirected, degree
+from torch_geometric.datasets import Planetoid  # Using Planetoid for Wisconsin
+import os
+
+def calculate_node_homophily_index(edge_index, labels):
+    """
+    Calculate the Homophily Index for each node in the graph.
+
+    Parameters:
+    - edge_index: Tensor, the edge index tensor of shape [2, num_edges].
+    - labels: Tensor, the labels of the nodes of shape [num_nodes].
+
+    Returns:
+    - node_hi: Tensor, the Homophily Index for each node.
+    """
+    # Ensure edge_index is undirected
+    edge_index = to_undirected(edge_index)
+
+    # Initialize a tensor to store homophily index for each node
+    node_hi = torch.zeros(labels.size(0))
+
+    # Calculate degree for normalization
+    deg = degree(edge_index[0], num_nodes=labels.size(0))
+
+    for node in range(labels.size(0)):
+        # Find neighbors of the node
+        neighbors = edge_index[1][edge_index[0] == node]
+        if neighbors.size(0) > 0:
+            # Calculate the homophily index as the fraction of neighbors with the same label
+            same_label = labels[neighbors] == labels[node]
+            node_hi[node] = same_label.float().sum() / deg[node]
+        else:
+            # If a node has no neighbors, we can set the HI to a default value or handle separately
+            node_hi[node] = torch.tensor(float('nan'))  # Or set to 0 or other placeholder value
+
+    return node_hi
+
 def calc_te(adj, e, Wh):
     degrees = adj.sum(dim=1)
     _, nodes = torch.topk(degrees, int(adj.size(0)*.05), largest=True)
@@ -38,10 +76,10 @@ def calc_te(adj, e, Wh):
     sumte += 1e-9
     return tes
 
-def calc_te_matrix(adj: torch.tensor, e: torch.tensor, Wh: torch.tensor = None) -> torch.tensor:
+def calc_te_matrix(adj: torch.tensor, e: torch.tensor, nodes_pct=100, Wh: torch.tensor = None) -> torch.tensor:
     tematrix = torch.zeros(size=adj.shape, dtype=adj.dtype)
     degrees = adj.sum(dim=1)
-    _, nodes = torch.topk(degrees, int(adj.size(0)*.05), largest=False)
+    _, nodes = torch.topk(degrees, int(adj.size(0)*(nodes_pct/100.)), largest=False)
     sumte = 0.
     tes = []
     with torch.no_grad():

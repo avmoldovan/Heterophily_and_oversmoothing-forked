@@ -7,6 +7,9 @@ from torch.nn.parameter import Parameter
 from torch_geometric.nn import MessagePassing, APPNP
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from PyIF import te_compute as te
+from utils import calculate_node_homophily_index
+
+
 # -----------------------------------------------------------------------------GCN-------------------------------------------------------------------------------------------------------------
 class GCNConvolution(nn.Module):
     """
@@ -730,14 +733,13 @@ class GGCNlayer(nn.Module):
         self.sftmax = nn.Softmax(dim=-1)
         self.sftpls = nn.Softplus(beta=1)
 
-    def forward(self, h, adj, degree_precompute):
+    def forward(self, h, adj, degree_precompute, epoch=None):
         if self.use_degree:
             sc = self.deg_coeff[0]*degree_precompute+self.deg_coeff[1]
             sc = self.sftpls(sc)
 
         Wh = self.fcn(h)
 
-        #TODO: multiply Wh with 1.-TE even if TE is calculated only partially; needs a matrix and set only the values needed there
         #TODO: of Spos and Sneg we need to assign TE somehow; there are only a few negative TE and same is Sneg
         if self.use_sign:
             prod = torch.matmul(Wh, torch.transpose(Wh, 0, 1))
@@ -765,7 +767,29 @@ class GGCNlayer(nn.Module):
             coeff = self.sftmax(self.coeff)
             scale = self.sftpls(self.scale)
 
+            # if self.training == True and epoch != None and epoch > 0 and epoch % 20 == 0:
+            #     # #telist = self.calc_te(adj, e, Wh)
+            #     #self.temat = calc_te_matrix(adj, x, 5)
+            #     temat = calc_te_matrix(adj, Wh, 10)
+            #     # # #relute = F.relu(temat)
+            #     #tanhte = F.tanh(temat)
+            #     #temedian = temat.median()
+            #     # # #lintemat = self.fcn(temat)
+            #     # # #layer_inner = torch.matmul(1.-temat.to(layer_inner.device), layer_inner)
+            #     #layer_inner = layer_inner + temedian #torch.matmul(tesum, layer_inner)
+            #
+            #     #if self.training == True and epoch > 30 and hasattr(self, 'temat'):
+            #     #layer_inner = layer_inner - self.temat.median() #torch.matmul(tesum, layer_inner)
+            #     #Wh = Wh+temat.median()
+            #
+            #     med = temat.sum()
+            #
+            # if 'med' in locals().keys():
+            #     result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh)-med
+            #     #print('here')
+            # else:
             result = scale*(coeff[0]*prop_pos+coeff[1]*prop_neg+coeff[2]*Wh)
+
 
             # # Extract the submatrix of adj corresponding to the top nodes
             # sub_adj = adj.to_dense()[top_nodes, :][:, top_nodes]
@@ -863,7 +887,7 @@ class GGCN(nn.Module):
         self.degree_precompute = torch.sparse.FloatTensor(adj_i, v_new, adj.size())
     
     
-    def forward(self, x, adj):
+    def forward(self, x, adj, epoch=None, labels=None, idx_train=None):
         if self.use_degree:
             if self.degree_precompute is None:
                 if self.use_sparse:
@@ -876,15 +900,19 @@ class GGCN(nn.Module):
         layer_inner = self.convs[0](x, adj, self.degree_precompute)
 
 
-        #telist = self.calc_te(adj, e, Wh)
+        hti = calculate_node_homophily_index(adj._indices, labels[idx_train])
 
-        temat = calc_te_matrix(adj, x)
-        relute = F.relu(temat)
-        #lintemat = self.fcn(temat)
-        layer_inner = torch.matmul(1.-relute.to(layer_inner.device), layer_inner)
+        # if self.training == True and epoch > 0 and epoch % 30 == 0:
+        #     # #telist = self.calc_te(adj, e, Wh)
+        #     #self.temat = calc_te_matrix(adj, x, 5)
+        #     calc_te_matrix(adj, layer_inner, 10)
+        #     # # #relute = F.relu(temat)
+        #     # # #tanhte = F.tanh(temat)
+        #     #temedian = temat.median()
+        #     # # #lintemat = self.fcn(temat)
+        #     # # #layer_inner = torch.matmul(1.-temat.to(layer_inner.device), layer_inner)
+        #     #layer_inner = layer_inner + temedian #torch.matmul(tesum, layer_inner)
 
-        firstlayer = None
-        teitem = 0.0
         for i,con in enumerate(self.convs[1:]):
             if self.use_norm:
                 layer_inner = self.norms[i](layer_inner)
@@ -898,14 +926,15 @@ class GGCN(nn.Module):
                 else:
                     coeff = 1
                 layer_previous = coeff*layer_inner + layer_previous
-            layer_inner = con(layer_previous,adj,self.degree_precompute)
+            layer_inner = con(layer_previous,adj,self.degree_precompute, epoch)
             # if i == 0:
             #     firstlayer = layer_inner
             # if i == (len(self.convs[1:]) - 1):
             #     teitem = te.te_compute(firstlayer.view(-1).detach().cpu().numpy(), layer_inner.view(-1).detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
 
-
-        #Wh = Wh+temat.median()
+        # if self.training == True and epoch > 30 and hasattr(self, 'temat'):
+        #     layer_inner = layer_inner - self.temat.median() #torch.matmul(tesum, layer_inner)
+        # #Wh = Wh+temat.median()
 
         # degrees = adj.sum(dim=1)
         #

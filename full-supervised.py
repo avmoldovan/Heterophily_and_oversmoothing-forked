@@ -49,8 +49,8 @@ parser.add_argument('--alpha_relu', type=float, default=0.2, help='Alpha for the
 parser.add_argument('--nb_heads', type=int, default=8, help='Number of head attentions.')
 parser.add_argument('--row_normalized_adj', action='store_true', default=False, help='choose normalization')
 parser.add_argument('--no_degree', action='store_false', default=True, help='do not use degree correction (degree correction only used with symmetric normalization)')
-parser.add_argument('--no_sign', action='store_false', default=False, help='do not use signed weights')
-parser.add_argument('--no_decay', action='store_false', default=False, help='do not use decaying in the residual connection')
+parser.add_argument('--no_sign', action='store_false', default=True, help='do not use signed weights')
+parser.add_argument('--no_decay', action='store_false', default=True, help='do not use decaying in the residual connection')
 parser.add_argument('--use_bn', action='store_true', default=False, help='use batch norm when not using decaying')
 parser.add_argument('--use_ln', action='store_true', default=False, help='use layer norm when not using decaying')
 parser.add_argument('--exponent', type=float, default=3.0, help='exponent in the decay function')
@@ -126,13 +126,24 @@ def get_acc_h_dist(output, out_last2, labels, deg_vec, idx_test, raw_adj, n_grou
     return acc_deg, h_deg, h_deg_ori
 
 
-def train_step(model,optimizer, features, labels, adj, idx_train, use_geom):
+def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoch):
+
+    # # Load the Wisconsin dataset
+    # path = os.path.join(os.getcwd(), 'data', 'Planetoid')
+    # dataset = Planetoid(root=path, name='Wisconsin')
+    #
+    # # Calculate the Homophily Index for the graph in the dataset
+    # # Note: The Wisconsin dataset, like Cora, consists of a single, large graph.
+    # for data in dataset:
+    #     hi = calculate_homophily_index(data.edge_index, data.y)
+    #     print(f"Homophily Index: {hi}")
+
     model.train()
     optimizer.zero_grad()
     if use_geom:
         output = model(features)
     else:
-        output = model(features,adj)
+        output = model(features,adj, epoch, labels, idx_train)
     acc_train = accuracy(output[idx_train], labels[idx_train].to(device))
     loss_train = F.nll_loss(output[idx_train], labels[idx_train].to(device))
     loss_train.backward()
@@ -140,13 +151,13 @@ def train_step(model,optimizer, features, labels, adj, idx_train, use_geom):
     return loss_train.item(),acc_train.item()
 
 
-def validate_step(model,features,labels,adj,idx_val, use_geom):
+def validate_step(model,features,labels,adj,idx_val, use_geom, epoch):
     model.eval()
     with torch.no_grad():
         if use_geom:
             output = model(features)
         else:
-            output = model(features,adj)
+            output = model(features,adj, epoch)
         loss_val = F.nll_loss(output[idx_val], labels[idx_val].to(device))
         acc_val = accuracy(output[idx_val], labels[idx_val].to(device))
         return loss_val.item(),acc_val.item()
@@ -237,8 +248,8 @@ def train(datastr,splitstr):
     bad_counter = 0
     best = 999999999
     for epoch in range(args.epochs):
-        loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom)
-        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom)
+        loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom, epoch)
+        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch)
         if(epoch+1)%1 == 0: 
             print('Epoch:{:04d}'.format(epoch+1),
                 'train',
