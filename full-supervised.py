@@ -126,7 +126,7 @@ def get_acc_h_dist(output, out_last2, labels, deg_vec, idx_test, raw_adj, n_grou
     return acc_deg, h_deg, h_deg_ori
 
 
-def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoch):
+def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoch, sparse_adj):
 
     # # Load the Wisconsin dataset
     # path = os.path.join(os.getcwd(), 'data', 'Planetoid')
@@ -143,7 +143,7 @@ def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoc
     if use_geom:
         output = model(features)
     else:
-        output = model(features,adj, epoch, labels, idx_train)
+        output = model(features,adj, epoch, labels, idx_train, sparse_adj)
     acc_train = accuracy(output[idx_train], labels[idx_train].to(device))
     loss_train = F.nll_loss(output[idx_train], labels[idx_train].to(device))
     loss_train.backward()
@@ -151,13 +151,13 @@ def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoc
     return loss_train.item(),acc_train.item()
 
 
-def validate_step(model,features,labels,adj,idx_val, use_geom, epoch):
+def validate_step(model,features,labels,adj,idx_val, use_geom, epoch, sparse_adj):
     model.eval()
     with torch.no_grad():
         if use_geom:
             output = model(features)
         else:
-            output = model(features,adj, epoch)
+            output = model(features,adj, epoch, sparse_adj)
         loss_val = F.nll_loss(output[idx_val], labels[idx_val].to(device))
         acc_val = accuracy(output[idx_val], labels[idx_val].to(device))
         return loss_val.item(),acc_val.item()
@@ -225,6 +225,7 @@ def train(datastr,splitstr):
         use_bn = (args.use_bn) & (not use_decay)
         use_ln = (args.use_ln) & (not use_decay) & (not use_bn)
         model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln).to(device)
+        sparse_adj = adj
         if not args.use_sparse:
             adj = adj.to_dense()
     elif args.model=="MLP":
@@ -248,8 +249,8 @@ def train(datastr,splitstr):
     bad_counter = 0
     best = 999999999
     for epoch in range(args.epochs):
-        loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom, epoch)
-        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch)
+        loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom, epoch, sparse_adj)
+        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch, sparse_adj)
         if(epoch+1)%1 == 0: 
             print('Epoch:{:04d}'.format(epoch+1),
                 'train',

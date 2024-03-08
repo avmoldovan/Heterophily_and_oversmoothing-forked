@@ -17,9 +17,49 @@ from torch_geometric.utils import to_undirected, degree
 from torch_geometric.datasets import Planetoid  # Using Planetoid for Wisconsin
 import os
 
-def calculate_node_homophily_index(edge_index, labels):
+def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_train):
     """
     Calculate the Homophily Index for each node in the graph.
+
+    Parameters:
+    - edge_index: Tensor, the edge index tensor of shape [2, num_edges].
+    - labels: Tensor, the labels of the nodes of shape [num_nodes].
+
+    Returns:
+    - node_hi: Tensor, the Homophily Index for each node.
+    """
+    # # Ensure edge_index is undirected
+    # edge_index = to_undirected(edge_index)
+    #
+    # # Initialize a tensor to store homophily index for each node
+    # node_hi = torch.zeros(labels.size(0))
+    #
+    # # Calculate degree for normalization
+    # deg = degree(edge_index[0], num_nodes=labels.size(0))
+
+    deg = strided_adj.sum(dim=1)
+    #deg = degree(adj._indices()[0], num_nodes=labels.size(0))
+    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=True)
+    node_hi = torch.zeros(labels.size(0))
+    with torch.no_grad():
+        for node in nodes:
+            # Find nodes connected to the current top node
+            #neighbors = ((strided_adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+            neighbors = sparse_adj[node]
+
+            if neighbors.size(0) > 0:
+                # Calculate the homophily index as the fraction of neighbors with the same label
+                same_label = labels[neighbors.to_dense().to('cpu').to(torch.int64)] == labels[node]
+                node_hi[node] = same_label.float().sum() / deg[node]
+            else:
+                # If a node has no neighbors, we can set the HI to a default value or handle separately
+                node_hi[node] = torch.tensor(float(0.))  # Or set to 0 or other placeholder value
+
+    return node_hi
+
+def calculate_node_homophily_index(edge_index, labels):
+    """
+    Calculate the Homophily Index for each node in the graph
 
     Parameters:
     - edge_index: Tensor, the edge index tensor of shape [2, num_edges].
@@ -49,6 +89,30 @@ def calculate_node_homophily_index(edge_index, labels):
             node_hi[node] = torch.tensor(float('nan'))  # Or set to 0 or other placeholder value
 
     return node_hi
+
+def calc_te_for_node(node_index, adj, e):
+    degrees = adj.sum(dim=1)
+    _, nodes = torch.topk(degrees, adj.size(0))
+    sumte = 0.
+    tes = []
+    with torch.no_grad():
+        #for node in nodes:
+        # Find nodes connected to the current top node
+        connected_nodes = ((adj.to_dense())[node_index] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+        if connected_nodes.size > 0:
+            for cn in connected_nodes:
+                # xi_detached = x_i.t().detach().cpu().numpy()
+                # for i, xi in enumerate(xi_detached):
+                teitem = te.te_compute(e[node_index].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                tes.append(teitem)
+                #sumte += teitem
+                # try to update support only for nodes with connections that have smallest feature length
+                #result[node] *= teitem
+    # Find indices of top 100 nodes with highest degrees
+    # _, min_nodes = torch.topk(degrees, int(adj.size(0) / 80), largest=False)  # 600
+    # _, max_nodes = torch.topk(degrees, int(adj.size(0) / 600), largest=True)  # 999
+    sumte += 1e-9
+    return tes
 
 def calc_te(adj, e, Wh):
     degrees = adj.sum(dim=1)

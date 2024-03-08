@@ -7,7 +7,7 @@ from torch.nn.parameter import Parameter
 from torch_geometric.nn import MessagePassing, APPNP
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from PyIF import te_compute as te
-from utils import calculate_node_homophily_index
+from utils import calculate_node_homophily_index, calculate_node_homophily_index_sparse, calc_te_for_node
 
 
 # -----------------------------------------------------------------------------GCN-------------------------------------------------------------------------------------------------------------
@@ -887,7 +887,7 @@ class GGCN(nn.Module):
         self.degree_precompute = torch.sparse.FloatTensor(adj_i, v_new, adj.size())
     
     
-    def forward(self, x, adj, epoch=None, labels=None, idx_train=None):
+    def forward(self, x, adj, epoch=None, labels=None, idx_train=None, sparse_adj=None):
         if self.use_degree:
             if self.degree_precompute is None:
                 if self.use_sparse:
@@ -900,7 +900,11 @@ class GGCN(nn.Module):
         layer_inner = self.convs[0](x, adj, self.degree_precompute)
 
 
-        hti = calculate_node_homophily_index(adj._indices, labels[idx_train])
+        hti = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
+        i = 0
+        for hom_node_max in hti:
+            layer_previous[i] += np.sum(calc_te_for_node(i, adj, layer_previous))
+            i+=1
 
         # if self.training == True and epoch > 0 and epoch % 30 == 0:
         #     # #telist = self.calc_te(adj, e, Wh)
