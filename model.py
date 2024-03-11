@@ -8,7 +8,7 @@ from torch_geometric.nn import MessagePassing, APPNP
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 from PyIF import te_compute as te
 from utils import calculate_node_homophily_index, calculate_node_homophily_index_sparse, calc_te_for_node
-
+from collections import OrderedDict
 
 # -----------------------------------------------------------------------------GCN-------------------------------------------------------------------------------------------------------------
 class GCNConvolution(nn.Module):
@@ -862,6 +862,7 @@ class GGCN(nn.Module):
         self.use_degree = use_degree
         self.use_sparse = use_sparse
         self.use_norm = use_bn or use_ln
+        self.nclass = nclass
         if self.use_norm:
             self.norms = nn.ModuleList()
         if use_bn:
@@ -910,9 +911,11 @@ class GGCN(nn.Module):
             for nodekey in self.htidict.keys():
                 #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
                 #TODO: try to calc TE just for one highest degree node
-                tes = calc_te_for_node(nodekey, adj, layer_previous)
+                tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
+                self.od = OrderedDict()
                 if tes is not None and len(tes) > 0:
-                    layer_previous[nodekey] += np.sum(tes)
+                    layer_previous[nodekey] += np.max(tes)
+                    self.od[nodekey] = np.max(tes)
                 i = i + 1
                 # if i > adj.size()[0] / 20:
                 #     break
@@ -942,6 +945,13 @@ class GGCN(nn.Module):
                     coeff = 1
                 layer_previous = coeff*layer_inner + layer_previous
             layer_inner = con(layer_previous,adj,self.degree_precompute, epoch)
+
+            if self.htidict is not None:
+                for nodekey in self.htidict.keys():
+                    #tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
+                    if self.od is not None:
+                        layer_inner[nodekey] += self.od[nodekey]
+
             # if i == 0:
             #     firstlayer = layer_inner
             # if i == (len(self.convs[1:]) - 1):

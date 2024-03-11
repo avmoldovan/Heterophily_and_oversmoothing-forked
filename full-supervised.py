@@ -272,6 +272,7 @@ def train(datastr,splitstr):
     bad_counter = 0
     best = 999999999
     for epoch in range(args.epochs):
+        torch.cuda.empty_cache()
         loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom, epoch, sparse_adj)
         loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch, sparse_adj)
         if(epoch+1)%1 == 0: 
