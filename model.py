@@ -912,10 +912,8 @@ class GGCN(nn.Module):
                 #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
                 #TODO: try to calc TE just for one highest degree node
                 tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
-                self.od = OrderedDict()
                 if tes is not None and len(tes) > 0:
                     layer_previous[nodekey] += np.max(tes)
-                    self.od[nodekey] = np.max(tes)
                 i = i + 1
                 # if i > adj.size()[0] / 20:
                 #     break
@@ -948,9 +946,11 @@ class GGCN(nn.Module):
 
             if self.htidict is not None:
                 for nodekey in self.htidict.keys():
-                    #tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
-                    if self.od is not None:
-                        layer_inner[nodekey] += self.od[nodekey]
+                    #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
+                    #TODO: try to calc TE just for one highest degree node
+                    tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
+                    if tes is not None and len(tes) > 0:
+                        layer_inner[nodekey] += np.max(tes)
 
             # if i == 0:
             #     firstlayer = layer_inner
