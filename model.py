@@ -902,20 +902,20 @@ class GGCN(nn.Module):
         layer_inner = self.convs[0](x, adj, self.degree_precompute)
 
         if self.training == True:
-            if self.hti == None:
-                htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
-                self.hti = htitensor
-                self.htidict = htidict
+            #if self.hti == None:
+            htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
+            self.hti = htitensor
+            self.htidict = htidict
             i = 0
             for nodekey in self.htidict.keys():
                 #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
                 #TODO: try to calc TE just for one highest degree node
                 tes = calc_te_for_node(nodekey, adj, layer_previous)
                 if tes is not None and len(tes) > 0:
-                    layer_previous[nodekey] += np.max(tes)
+                    layer_previous[nodekey] += np.sum(tes)
                 i = i + 1
-                if i > adj.size()[0] / 10:
-                    break
+                # if i > adj.size()[0] / 20:
+                #     break
 
         # if self.training == True and epoch > 0 and epoch % 30 == 0:
         #     # #telist = self.calc_te(adj, e, Wh)

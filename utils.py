@@ -41,7 +41,7 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
 
     deg = strided_adj.sum(dim=1)
     #deg = degree(adj._indices()[0], num_nodes=labels.size(0))
-    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=False)
+    _, nodes = torch.topk(deg, int(strided_adj.size(0)/20), largest=True)
     node_hi = torch.zeros(labels.size(0))
     htis = OrderedDict()
     with torch.no_grad():
