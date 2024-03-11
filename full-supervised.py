@@ -1,5 +1,7 @@
 from __future__ import division
 from __future__ import print_function
+
+import os
 import time
 import random
 import argparse
@@ -13,6 +15,9 @@ from model import *
 from model_GeomGCN import *
 from torch_geometric.data import Data
 import dgl
+
+import neptune
+
 
 import uuid
 
@@ -71,12 +76,30 @@ parser.add_argument('--learning_rate_decay_patience', type=int, default=50, help
 parser.add_argument('--learning_rate_decay_factor', type=float, default=0.8, help='only for GeomGCN baseline')
 parser.add_argument('--emb', type=str, default='poincare', help='Embedding methods used for GeomGCN baseline, poincare, struc2vec, MDS')
 
+parser.add_argument('--neptune', type=bool, default=True, help='Records neptune data')
+
 
 args = parser.parse_args()
 random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
+
+
+pname = 'adrian.moldovan/GGCN'
+token = os.environ['NEPTUNE_TOKEN']
+if (args.neptune):
+    run = neptune.init_run(
+        project=pname,
+        api_token=token,
+        source_files=['*.py'],
+        tags=['top10% lowest degree', 'previous_layer += max(tes) per node', 'before convs', 'GGCN', 'with HTI calc'],
+        #mode='read-only'
+    )  # your credentials
+
+    # project = neptune.get_project(
+    #     name=pname,
+    #     api_token=token)
 
 
 cudaid = "cuda:"+str(args.dev)

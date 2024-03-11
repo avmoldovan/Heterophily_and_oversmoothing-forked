@@ -37,10 +37,13 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
     # # Calculate degree for normalization
     # deg = degree(edge_index[0], num_nodes=labels.size(0))
 
+    from collections import OrderedDict
+
     deg = strided_adj.sum(dim=1)
     #deg = degree(adj._indices()[0], num_nodes=labels.size(0))
-    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=True)
+    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=False)
     node_hi = torch.zeros(labels.size(0))
+    htis = OrderedDict()
     with torch.no_grad():
         for node in nodes:
             # Find nodes connected to the current top node
@@ -50,12 +53,15 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
             if neighbors.size(0) > 0:
                 # Calculate the homophily index as the fraction of neighbors with the same label
                 same_label = labels[neighbors.to_dense().to('cpu').to(torch.int64)] == labels[node]
-                node_hi[node] = same_label.float().sum() / deg[node]
+                htival = same_label.float().sum() / deg[node]
+                node_hi[node] = htival
+                htis [node] = htival
             else:
                 # If a node has no neighbors, we can set the HI to a default value or handle separately
                 node_hi[node] = torch.tensor(float(0.))  # Or set to 0 or other placeholder value
+                htis [node] = torch.tensor(float(0.))
 
-    return node_hi
+    return node_hi, htis
 
 def calculate_node_homophily_index(edge_index, labels):
     """
@@ -68,6 +74,7 @@ def calculate_node_homophily_index(edge_index, labels):
     Returns:
     - node_hi: Tensor, the Homophily Index for each node.
     """
+
     # Ensure edge_index is undirected
     edge_index = to_undirected(edge_index)
 
@@ -92,14 +99,14 @@ def calculate_node_homophily_index(edge_index, labels):
 
 def calc_te_for_node(node_index, adj, e):
     degrees = adj.sum(dim=1)
-    _, nodes = torch.topk(degrees, adj.size(0))
+    #_, nodes = torch.topk(degrees, int(adj.size(0) * .05), largest=True)
     sumte = 0.
     tes = []
     with torch.no_grad():
         #for node in nodes:
         # Find nodes connected to the current top node
         connected_nodes = ((adj.to_dense())[node_index] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-        if connected_nodes.size > 0:
+        if connected_nodes.size > 1:
             for cn in connected_nodes:
                 # xi_detached = x_i.t().detach().cpu().numpy()
                 # for i, xi in enumerate(xi_detached):
