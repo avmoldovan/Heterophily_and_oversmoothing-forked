@@ -88,18 +88,18 @@ torch.cuda.manual_seed(args.seed)
 
 pname = 'adrian.moldovan/GGCN'
 token = os.environ['NEPTUNE_TOKEN']
-if (args.neptune):
-    run = neptune.init_run(
-        project=pname,
-        api_token=token,
-        source_files=['*.py'],
-        tags=['top10% lowest degree', 'previous_layer += max(tes) per node', 'before convs', 'GGCN', 'with HTI calc'],
-        #mode='read-only'
-    )  # your credentials
-
-    # project = neptune.get_project(
-    #     name=pname,
-    #     api_token=token)
+# if (args.neptune):
+#     run = neptune.init_run(
+#         project=pname,
+#         api_token=token,
+#         source_files=['*.py'],
+#         tags=['top10% lowest degree', 'previous_layer += max(tes) per node', 'before convs', 'GGCN', 'with HTI calc'],
+#         #mode='read-only'
+#     )  # your credentials
+#
+#     # project = neptune.get_project(
+#     #     name=pname,
+#     #     api_token=token)
 
 
 cudaid = "cuda:"+str(args.dev)
