@@ -177,7 +177,7 @@ def full_load_data(dataset_name, splits_file_path=None, use_raw_normalize=False,
     if get_degree:
         deg_vec = np.array(adj.sum(1))
         deg_vec = deg_vec.flatten()
-        raw_adj = sparse_mx_to_torch_sparse_tensor(adj)
+        raw_adj = sparse_mx_to_torch_sparse_tensor(adj, model_type)
     else:
         deg_vec = None
         raw_adj = None

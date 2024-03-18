@@ -41,7 +41,7 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
 
     deg = strided_adj.sum(dim=1)
     #deg = degree(adj._indices()[0], num_nodes=labels.size(0))
-    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=False)
+    _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=True)
     node_hi = torch.zeros(labels.size(0))
     htis = OrderedDict()
     with torch.no_grad():
@@ -54,12 +54,12 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
                 # Calculate the homophily index as the fraction of neighbors with the same label
                 same_label = labels[neighbors.to_dense().to('cpu').to(torch.int64)] == labels[node]
                 htival = same_label.float().sum() / deg[node]
-                node_hi[node] = htival
-                htis [node] = htival
+                node_hi[node.item()] = 1. - htival
+                htis [node.item()] = 1. - htival
             else:
                 # If a node has no neighbors, we can set the HI to a default value or handle separately
-                node_hi[node] = torch.tensor(float(0.))  # Or set to 0 or other placeholder value
-                htis [node] = torch.tensor(float(0.))
+                node_hi[node.item()] = torch.tensor(float(0.))  # Or set to 0 or other placeholder value
+                htis [node.item()] = torch.tensor(float(0.))
 
     return node_hi, htis
 
@@ -98,10 +98,11 @@ def calculate_node_homophily_index(edge_index, labels):
     return node_hi
 
 def calc_te_for_node(node_index, adj, e, nclass):
-    degrees = adj.sum(dim=1)
+    #degrees = adj.sum(dim=1)
     #_, nodes = torch.topk(degrees, int(adj.size(0) * .05), largest=True)
     sumte = 0.
     tes = []
+    enorm = torch.relu(e).detach().cpu().numpy()
     with torch.no_grad():
         #for node in nodes:
         # Find nodes connected to the current top node
@@ -110,7 +111,7 @@ def calc_te_for_node(node_index, adj, e, nclass):
             for cn in connected_nodes:
                 # xi_detached = x_i.t().detach().cpu().numpy()
                 # for i, xi in enumerate(xi_detached):
-                teitem = te.te_compute(e[node_index].detach().cpu().numpy(), e[cn].detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+                teitem = te.te_compute(enorm[node_index], enorm[cn], k=1, embedding=1, safetyCheck=False, GPU=False)
                 tes.append(teitem)
                 #sumte += teitem
                 # try to update support only for nodes with connections that have smallest feature length

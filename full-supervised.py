@@ -64,7 +64,7 @@ parser.add_argument('--use_res', action='store_true', default=False, help='use r
 parser.add_argument('--use_sparse', action='store_true', default=False, help='use sparse version of GGNN and GAT for large graphs')
 parser.add_argument('--scale_init', type=float, default=0.5, help='initial values of scale (when decaying combination is not used)')
 parser.add_argument('--deg_intercept_init', type=float, default=0.5, help='initial values of deg_intercept (when decaying combination is not used)')
-parser.add_argument('--get_degree', action='store_true', default=False, help='get acc V.S degree (Only support GCN model)')
+parser.add_argument('--get_degree', action='store_true', default=True, help='get acc V.S degree (Only support GCN model)')
 parser.add_argument('--n_groups', type=int, default=5, help='Number of degree groups.')
 ################# GeomGCN parameters#########################################################################
 parser.add_argument('--ggcn_merge', type=str, default='cat')
@@ -88,18 +88,19 @@ torch.cuda.manual_seed(args.seed)
 
 pname = 'adrian.moldovan/GGCN'
 token = os.environ['NEPTUNE_TOKEN']
-# if (args.neptune):
-#     run = neptune.init_run(
-#         project=pname,
-#         api_token=token,
-#         source_files=['*.py'],
-#         tags=['top10% lowest degree', 'previous_layer += max(tes) per node', 'before convs', 'GGCN', 'with HTI calc'],
-#         #mode='read-only'
-#     )  # your credentials
-#
-#     # project = neptune.get_project(
-#     #     name=pname,
-#     #     api_token=token)
+if (args.neptune):
+    run = neptune.init_run(
+        project=pname,
+        api_token=token,
+        source_files=['*.py'],
+        #tags=['top10% lowest degree', 'previous_layer += max(tes) per node', 'before convs', 'GGCN', 'with HTI calc'],
+        tags=['top20% lowest degree', 'Wh += max(tes)', 'before convs', 'GGCN', 'with HTI calc'],
+        #mode='read-only'
+    )  # your credentials
+
+    # project = neptune.get_project(
+    #     name=pname,
+    #     api_token=token)
 
 
 cudaid = "cuda:"+str(args.dev)
@@ -119,7 +120,7 @@ def get_acc_h_dist(output, out_last2, labels, deg_vec, idx_test, raw_adj, n_grou
     # print(np.power(2, group_end))
     ##### make sure to include the nodes with the max degree
     group_end[-1] += 1
-    group_mapping = np.zeros((n_groups,deg_vec.shape[-1]), dtype=np.bool)
+    group_mapping = np.zeros((n_groups,deg_vec.shape[-1]), dtype=bool)
     for i, ind_deg in enumerate(deg_vec):
         if ind_deg!=0:
             g_id = np.argmax(group_end>np.log2(ind_deg))
@@ -174,29 +175,30 @@ def train_step(model,optimizer, features, labels, adj, idx_train, use_geom, epoc
     return loss_train.item(),acc_train.item()
 
 
-def validate_step(model,features,labels,adj,idx_val, use_geom, epoch, sparse_adj):
+def validate_step(model,features,labels,adj,idx_val, use_geom, epoch, idx_train, sparse_adj):
     model.eval()
     with torch.no_grad():
         if use_geom:
             output = model(features)
         else:
-            output = model(features,adj, epoch, sparse_adj)
+            output = model(features,adj, epoch, labels, idx_train, sparse_adj)
         loss_val = F.nll_loss(output[idx_val], labels[idx_val].to(device))
         acc_val = accuracy(output[idx_val], labels[idx_val].to(device))
         return loss_val.item(),acc_val.item()
 
-def test_step(model, features, labels, adj, idx_test, use_geom, deg_vec, raw_adj):
+def test_step(model, features, labels, adj, idx_test, use_geom, deg_vec, raw_adj, idx_train, sparse_adj):
     model.load_state_dict(torch.load(checkpt_file))
     model.eval()
     with torch.no_grad():
         if use_geom:
             output = model(features)
         else:
-            output = model(features,adj)
+            output = model(features,adj, epoch=None, labels=labels, idx_train=idx_test, sparse_adj=adj)
         loss_test = F.nll_loss(output[idx_test], labels[idx_test].to(device))
         acc_test = accuracy(output[idx_test], labels[idx_test].to(device))
         if deg_vec is not None:
-            out_last2 = model(features,adj, True)
+            #out_last2 = model(features,adj, True)
+            out_last2 = model(features, adj, epoch=None, labels=labels, idx_train=idx_test, sparse_adj=adj)
             acc_deg, h_deg, h_deg_ori = get_acc_h_dist(output, out_last2, labels, deg_vec, idx_test, raw_adj)
         else:
             acc_deg = None 
@@ -208,6 +210,7 @@ def test_step(model, features, labels, adj, idx_test, use_geom, deg_vec, raw_adj
 def train(datastr,splitstr):
     use_geom=(args.model=='GEOMGCN')
     get_degree = (args.get_degree) & (args.model=="GCN")
+    get_degree = True
     adj, features, labels, idx_train, idx_val, idx_test, num_features, num_labels, deg_vec, raw_adj = full_load_data(datastr,splitstr,args.row_normalized_adj, model_type=args.model, embedding_method=args.emb, get_degree=get_degree)
     # print(torch.sum(torch.ones(idx_train.shape[0])[idx_train])/idx_train.shape[0]) ### check the training percentage
     features = features.to(device)
@@ -247,7 +250,12 @@ def train(datastr,splitstr):
         use_decay = args.no_decay
         use_bn = (args.use_bn) & (not use_decay)
         use_ln = (args.use_ln) & (not use_decay) & (not use_bn)
-        model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln).to(device)
+        model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln, neptune_inst=run).to(device)
+
+        if (args.neptune):
+            run["config/model"] = type(model).__name__
+            run["sys/tags"].add(str(args.data))
+
         sparse_adj = adj
         if not args.use_sparse:
             adj = adj.to_dense()
@@ -269,12 +277,18 @@ def train(datastr,splitstr):
         learning_rate_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
                                                                           factor=args.learning_rate_decay_factor,
                                                                           patience=args.learning_rate_decay_patience)
+
     bad_counter = 0
     best = 999999999
     for epoch in range(args.epochs):
         torch.cuda.empty_cache()
         loss_tra,acc_tra = train_step(model,optimizer,features,labels,adj,idx_train, use_geom, epoch, sparse_adj)
-        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch, sparse_adj)
+        loss_val,acc_val = validate_step(model,features,labels,adj,idx_val, use_geom, epoch, idx_train, sparse_adj)
+        run["training/epoch"].log(epoch)
+        run["training/trloss"].log(loss_tra)
+        run["training/tracc"].log(acc_tra*100.)
+        run["training/valloss"].log(loss_val)
+        run["training/accval"].log(acc_val*100.)
         if(epoch+1)%1 == 0: 
             print('Epoch:{:04d}'.format(epoch+1),
                 'train',
@@ -293,7 +307,7 @@ def train(datastr,splitstr):
         if bad_counter == args.patience:
             break
     
-    test_res = test_step(model,features,labels,adj,idx_test, use_geom, deg_vec, raw_adj)
+    test_res = test_step(model,features,labels,adj,idx_test, use_geom, deg_vec, raw_adj, idx_train, sparse_adj)
     acc = test_res[1]
     acc_deg, h_deg, h_deg_ori = test_res[-1]
     return acc*100, acc_deg, h_deg, h_deg_ori
@@ -303,7 +317,9 @@ acc_list = []
 acc_deg_mean = np.zeros((args.n_groups))
 h_deg_mean = np.zeros((args.n_groups))
 h_deg_ori_mean = np.zeros((args.n_groups))
-for i in range(10):
+
+
+for i in range(1):
     datastr = args.data
     splitstr = 'splits/'+args.data+'_split_0.6_0.2_'+str(i)+'.npz'
     acc, acc_deg, h_deg, h_deg_ori = train(datastr,splitstr)

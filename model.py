@@ -712,7 +712,7 @@ class GGCNlayer_SP(nn.Module):
         return result
 
 class GGCNlayer(nn.Module):
-    def __init__(self, in_features, out_features, use_degree=True, use_sign=True, use_decay=True, scale_init=0.5, deg_intercept_init=0.5):
+    def __init__(self, in_features, out_features, use_degree=True, use_sign=True, use_decay=True, scale_init=0.5, deg_intercept_init=0.5, neptun_inst=None):
         super(GGCNlayer, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -732,6 +732,7 @@ class GGCNlayer(nn.Module):
                 self.scale = nn.Parameter(scale_init*torch.ones([1]))
         self.sftmax = nn.Softmax(dim=-1)
         self.sftpls = nn.Softplus(beta=1)
+        self.run = neptun_inst
 
     def forward(self, h, adj, degree_precompute, epoch=None,  labels=None, idx_train=None, sparse_adj=None):
         if self.use_degree:
@@ -740,7 +741,7 @@ class GGCNlayer(nn.Module):
 
         Wh = self.fcn(h)
 
-        #TODO: of Spos and Sneg we need to assign TE somehow; there are only a few negative TE and same is Sneg
+
         if self.use_sign:
             prod = torch.matmul(Wh, torch.transpose(Wh, 0, 1))
             sq = torch.unsqueeze(torch.diag(prod),1)
@@ -766,29 +767,45 @@ class GGCNlayer(nn.Module):
         
             coeff = self.sftmax(self.coeff)
             scale = self.sftpls(self.scale)
-
-            # if self.training == True:
+            #
+            # if epoch is not None and epoch % 10 == 0:
+            #     #if self.training == True:
             #     #if self.hti == None:
             #     htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
             #     self.hti = htitensor
             #     self.htidict = htidict
             #     i = 0
-            #     max_tes = []
-            #     for nodekey in htidict.keys():
+            #     allsum = 0.
+            #     allabssum = 0.
+            #     maxabste = 0.
+            #     maxte = 0.
+            #     sorteddict = dict(sorted(self.htidict.items(), key=lambda item: item[1]))
+            #     for nodekey in sorteddict:
             #         #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
             #         tes = calc_te_for_node(nodekey, adj, Wh, 5)
             #         if tes is not None and len(tes) > 0:
-            #             #Wh[nodekey] += np.max(tes)
-            #             #max_tes.append(np.max(tes))
+            #             #allsum += np.max(tes)
+            #             if np.max(tes) > maxte:
+            #                 maxte = np.max(tes)
+            #                 allsum += maxte
+            #             if np.max(np.abs(tes)) > maxabste:
+            #                 maxabste = np.max(np.abs(tes))
+            #                 allabssum += maxabste
+            #             #Wh = Wh + maxte
             #         i = i + 1
-            #         # if i > adj.size()[0] / 20:
-            #         #     break
-            #     if max_tes is not None:
-            #         dd = torch.diag(torch.tensor(max_tes))
+            #         if i > adj.size()[0] / 20:
+            #             break
+            #     # #     if max_tes is not None:
+            #     # #         dd = torch.diag(torch.tensor(max_tes))
+            #     if hasattr(self, 'run'):
+            #         self.run["training/maxte"].log(maxte)
+            #         self.run["training/maxabste"].log(np.abs(maxabste))
+            #         self.run["training/maxhti"].log(max(htidict, key=htidict.get))
+            #         self.run["training/meanhti"].log(max(htidict, key=htidict.get))
+            #     Wh = Wh + allsum
 
 
-
-            # if self.training == True and epoch != None and epoch > 0 and epoch % 20 == 0:
+        # if self.training == True and epoch != None and epoch > 0 and epoch % 20 == 0:
             #     # #telist = self.calc_te(adj, e, Wh)
             #     #self.temat = calc_te_matrix(adj, x, 5)
             #     temat = calc_te_matrix(adj, Wh, 10)
@@ -860,18 +877,19 @@ class GGCNlayer(nn.Module):
 from utils import calc_te_matrix
         
 class GGCN(nn.Module):
-    def __init__(self, nfeat, nlayers, nhidden, nclass, dropout, decay_rate, exponent, use_degree=True, use_sign=True, use_decay=True, use_sparse=False, scale_init=0.5, deg_intercept_init=0.5, use_bn=False, use_ln=False):
+    def __init__(self, nfeat, nlayers, nhidden, nclass, dropout, decay_rate, exponent, use_degree=True, use_sign=True, use_decay=True, use_sparse=False, scale_init=0.5, deg_intercept_init=0.5, use_bn=False, use_ln=False, neptune_inst=None):
         super(GGCN, self).__init__()
+        self.run = neptune_inst
         self.dropout = dropout
         self.convs = nn.ModuleList()
         if use_sparse:
             model_sel = GGCNlayer_SP
         else:
             model_sel = GGCNlayer
-        self.convs.append(model_sel(nfeat, nhidden, use_degree, use_sign, use_decay, scale_init, deg_intercept_init))
+        self.convs.append(model_sel(nfeat, nhidden, use_degree, use_sign, use_decay, scale_init, deg_intercept_init, self.run if hasattr(self, 'run') else None))
         for _ in range(nlayers-2):
-            self.convs.append(model_sel(nhidden, nhidden, use_degree, use_sign, use_decay, scale_init, deg_intercept_init))
-        self.convs.append(model_sel(nhidden, nclass, use_degree, use_sign, use_decay, scale_init, deg_intercept_init))
+            self.convs.append(model_sel(nhidden, nhidden, use_degree, use_sign, use_decay, scale_init, deg_intercept_init, self.run if hasattr(self, 'run') else None))
+        self.convs.append(model_sel(nhidden, nclass, use_degree, use_sign, use_decay, scale_init, deg_intercept_init, self.run if hasattr(self, 'run') else None))
         self.fcn = nn.Linear(nfeat, nhidden)
         self.act_fn = F.elu
         self.dropout = dropout
@@ -923,22 +941,28 @@ class GGCN(nn.Module):
         layer_previous = self.act_fn(layer_previous)
         layer_inner = self.convs[0](x, adj, self.degree_precompute, epoch=epoch, labels=labels, idx_train=idx_train, sparse_adj=sparse_adj)
 
-        if self.training == True:
-            #if self.hti == None:
-            htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
-            self.hti = htitensor
-            self.htidict = htidict
-            i = 0
-            allsum = 0.
-            for nodekey in self.htidict.keys():
-                #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
-                tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
-                if tes is not None and len(tes) > 0:
-                    #allsum += np.max(tes)
-                    layer_previous[nodekey] *= np.abs(np.max(tes))
-                i = i + 1
-                # if i > adj.size()[0] / 10:
-                #     break
+
+
+
+
+        # if epoch is not None and epoch % 10 == 0:
+        #     #if self.training == True:
+        #     #if self.hti == None:
+        #     htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
+        #     self.hti = htitensor
+        #     self.htidict = htidict
+        #     i = 0
+        #     allsum = 0.
+        #     sorteddict = dict(sorted(self.htidict.items(), key=lambda item: item[1]))
+        #     for nodekey in sorteddict:
+        #         #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
+        #         tes = calc_te_for_node(nodekey, adj, layer_inner, self.nclass)
+        #         if tes is not None and len(tes) > 0:
+        #             #allsum += np.max(tes)
+        #             layer_inner[nodekey] += (np.max(tes))
+        #         #i = i + 1
+        # #         # if i > adj.size()[0] / 10:
+        # #         #     break
 
         # if self.training == True and epoch > 0 and epoch % 30 == 0:
         #     # #telist = self.calc_te(adj, e, Wh)
@@ -966,22 +990,46 @@ class GGCN(nn.Module):
                 layer_previous = coeff*layer_inner + layer_previous
             layer_inner = con(layer_previous,adj,self.degree_precompute, epoch,  labels=labels, idx_train=idx_train, sparse_adj=sparse_adj)
 
-            # if self.htidict is not None:
-            #     for nodekey in self.htidict.keys():
-            #         #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
-            #         #TODO: try to calc TE just for one highest degree node
-            #         tes = calc_te_for_node(nodekey, adj, layer_previous, self.nclass)
-            #         if tes is not None and len(tes) > 0:
-            #             layer_inner[nodekey] -= np.max(tes)
 
-            # if i == 0:
-            #     firstlayer = layer_inner
-            # if i == (len(self.convs[1:]) - 1):
-            #     teitem = te.te_compute(firstlayer.view(-1).detach().cpu().numpy(), layer_inner.view(-1).detach().cpu().numpy(), k=1, embedding=1, safetyCheck=False, GPU=False)
+        if epoch is not None:# and epoch % 10 == 0:
+            #if self.training == True:
+            #if self.hti == None:
+            htitensor, htidict = calculate_node_homophily_index_sparse(sparse_adj, adj, labels, idx_train)
+            self.hti = htitensor
+            self.htidict = htidict
+            i = 0
+            allsum = 0.
+            allabssum = 0.
+            maxabste = 0.
+            maxte = 0.
+            sorteddict = dict(sorted(self.htidict.items(), key=lambda item: item[1]))
+            for nodekey in sorteddict:
+                #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
+                tes = calc_te_for_node(nodekey, adj, layer_inner, 5)
+                if tes is not None and len(tes) > 0:
+                    #allsum += np.max(tes)
+                    if np.max(tes) > maxte:
+                        maxte = np.max(tes)
+                        allsum += maxte
+                    if np.max(np.abs(tes)) > maxabste:
+                        maxabste = np.max(np.abs(tes))
+                        allabssum += maxabste
+                    layer_inner[nodekey] += maxte
+                i = i + 1
+                if i > adj.size()[0] / 20:
+                    break
+            # #     if max_tes is not None:
+            # #         dd = torch.diag(torch.tensor(max_tes))
 
-        # if self.training == True and epoch > 30 and hasattr(self, 'temat'):
-        #     layer_inner = layer_inner - self.temat.median() #torch.matmul(tesum, layer_inner)
-        # #Wh = Wh+temat.median()
+            if hasattr(self, 'run'):
+                self.run["training/maxte"].log(maxte)
+                self.run["training/maxabste"].log(np.abs(maxabste))
+
+                htivalstensor = torch.tensor([x for x in dict(htidict).values()])
+                self.run["training/maxhti"].log(htivalstensor.max())
+                self.run["training/meanhti"].log(htivalstensor.mean())
+                self.run["training/medianhti"].log(htivalstensor.median())
+            #Wh = Wh + allsum
 
         # degrees = adj.sum(dim=1)
         #
