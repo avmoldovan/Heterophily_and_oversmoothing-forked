@@ -88,6 +88,7 @@ torch.cuda.manual_seed(args.seed)
 
 pname = 'adrian.moldovan/GGCN'
 token = os.environ['NEPTUNE_TOKEN']
+args.neptune = False
 if (args.neptune):
     run = neptune.init_run(
         project=pname,

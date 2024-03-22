@@ -111,7 +111,7 @@ def calc_te_for_node(node_index, adj, e, nclass):
             for cn in connected_nodes:
                 # xi_detached = x_i.t().detach().cpu().numpy()
                 # for i, xi in enumerate(xi_detached):
-                teitem = te.te_compute(enorm[node_index], enorm[cn], k=1, embedding=1, safetyCheck=False, GPU=False)
+                teitem = te.te_compute(enorm[node_index], enorm[cn], k=nclass, embedding=1, safetyCheck=False, GPU=False)
                 tes.append(teitem)
                 #sumte += teitem
                 # try to update support only for nodes with connections that have smallest feature length
