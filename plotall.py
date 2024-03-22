@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from torch_geometric.utils import *
 from process import full_load_data
+import numpy as np
 
 # List of datasets to load
 #datasets = ['Wisconsin', 'Chameleon', 'Cora', 'Squirrel',  'Actor', 'Texas', 'Cornell', 'Pubmed', 'Citeseer']
@@ -42,6 +43,9 @@ for i, dataset_name in enumerate(datasets):
     #
     # # Create a list of colors for each node based on its label
     # node_colors = [color_map[node_labels[node]] for node in G.nodes()]
+
+    G.remove_edges_from(nx.selfloop_edges(G))
+
     max_degree = max(dict(G.degree()).values())
     #node_classes = nx.get_node_attributes(G, 'class')  # Or the correct attribute name
 
@@ -51,13 +55,21 @@ for i, dataset_name in enumerate(datasets):
     #node_sizes = [300 * node_degrees[node] / max_degree for node in G.nodes()]  # Scaling
 
     layout = nx.spring_layout(G, seed=42)  # Seed for some layout consistency
+    cent = nx.degree_centrality(G)
+    node_size = list(map(lambda x: x * 500, cent.values()))
+    cent_array = np.array(list(cent.values()))
+    threshold = sorted(cent_array, reverse=True)[10]
+    cent_bin = np.where(cent_array >= threshold, 1, 0.1)
+
     #
     # # Plotting the graph
     # pos = nx.spring_layout(G)  # Generate a layout to spread out nodes
 
     nx.draw(G, pos=layout, ax=axs[i],
         #node_color=node_colors,
-        #node_size=node_sizes,
+        node_size=node_size,
+        node_color=cent_bin,
+        nodelist=list(cent.keys()),
         with_labels=False)  # Turn off labels for large graphs
     # # Draw nodes and edges separately to customize colors
     # nx.draw_networkx_nodes(G, ax=axs[i], pos=pos)
@@ -67,4 +79,6 @@ for i, dataset_name in enumerate(datasets):
     axs[i].set_title(dataset_name)
 
 plt.tight_layout()
+plt.savefig('plot.eps',format='eps', dpi=300)
+plt.savefig('plot.pdf',format='pdf', dpi=300)
 plt.show()
