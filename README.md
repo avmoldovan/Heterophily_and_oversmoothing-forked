@@ -1,16 +1,4 @@
-# Codes for the paper "Two Sides of the Same Coin: Heterophily and Oversmoothing in Graph Convolutional Neural Networks", which is accepted to The IEEE International Conference on Data Mining (ICDM 2022). A full version of the paper (including proofs) can be found at: https://arxiv.org/abs/2102.06462.
-## Please cite us if you find our code useful:
-
-<pre>
-@inproceedings{yan2022two,
-  title={Two sides of the same coin: Heterophily and oversmoothing in graph convolutional neural networks},
-  author={Yan, Yujun and Hashemi, Milad and Swersky, Kevin and Yang, Yaoqing and Koutra, Danai},
-  booktitle={2022 IEEE International Conference on Data Mining (ICDM)},
-  pages={1287--1292},
-  year={2022},
-  organization={IEEE}
-}
-</pre>
+# Codes for the paper "Transfer Entropy in Graph Convolutional Neural Networks"
 
 ## To run the code:
 ### Software Versions:
