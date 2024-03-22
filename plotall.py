@@ -16,6 +16,7 @@ axs = axs.flatten()  # Flatten to easily iterate
 node_labels = {0: 'A', 1: 'B', 2: 'A', 3: 'C', 4: 'D', 5: 'E', 6: 'F'}
 unique_labels = list(set(node_labels.values()))
 
+#plt.colormaps.plasma()
 
 for i, dataset_name in enumerate(datasets):
 
@@ -55,6 +56,7 @@ for i, dataset_name in enumerate(datasets):
     #node_sizes = [300 * node_degrees[node] / max_degree for node in G.nodes()]  # Scaling
 
     layout = nx.spring_layout(G, seed=42)  # Seed for some layout consistency
+    #layout = nx.kamada_kawai_layout(G)
     cent = nx.degree_centrality(G)
     node_size = list(map(lambda x: x * 500, cent.values()))
     cent_array = np.array(list(cent.values()))
@@ -70,13 +72,16 @@ for i, dataset_name in enumerate(datasets):
         node_size=node_size,
         node_color=cent_bin,
         nodelist=list(cent.keys()),
+        edge_color='grey',
+            linewidths=0.5,
+      #      edge_cmap= plt.colormaps.plasma,
         with_labels=False)  # Turn off labels for large graphs
     # # Draw nodes and edges separately to customize colors
     # nx.draw_networkx_nodes(G, ax=axs[i], pos=pos)
     # nx.draw_networkx_edges(G, ax=axs[i], pos=pos, edge_color='gray')  # Customize edge colors here
     # #nx.draw_networkx_labels(G, ax=axs[i], pos=pos)
     # #nx.draw(G, ax=axs[i], with_labels=False, node_size=30)
-    axs[i].set_title(dataset_name)
+    axs[i].set_title(dataset_name, fontsize=30)
 
 plt.tight_layout()
 plt.savefig('plot.eps',format='eps', dpi=300)
