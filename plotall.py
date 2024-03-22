@@ -10,7 +10,7 @@ import numpy as np
 datasets = ['Cora', 'Chameleon', 'Wisconsin']
 #datasets = ['Cora']
 
-fig, axs = plt.subplots(1, 3, figsize=(45, 15))
+fig, axs = plt.subplots(1, 3, figsize=(45, 15), constrained_layout=True)
 axs = axs.flatten()  # Flatten to easily iterate
 
 node_labels = {0: 'A', 1: 'B', 2: 'A', 3: 'C', 4: 'D', 5: 'E', 6: 'F'}
@@ -81,9 +81,11 @@ for i, dataset_name in enumerate(datasets):
     # nx.draw_networkx_edges(G, ax=axs[i], pos=pos, edge_color='gray')  # Customize edge colors here
     # #nx.draw_networkx_labels(G, ax=axs[i], pos=pos)
     # #nx.draw(G, ax=axs[i], with_labels=False, node_size=30)
-    axs[i].set_title(dataset_name, fontsize=30)
+    axs[i].set_title(dataset_name, fontsize=60)
 
-plt.tight_layout()
+#plt.tight_layout()
+plt.subplots_adjust(wspace=0, hspace=0)
 plt.savefig('plot.eps',format='eps', dpi=300)
 plt.savefig('plot.pdf',format='pdf', dpi=300)
+plt.savefig('plot.png',format='png', dpi=300)
 plt.show()
