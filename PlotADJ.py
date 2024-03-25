@@ -17,7 +17,7 @@ datasets = ['Cora', 'Chameleon', 'Wisconsin']
 
 
 
-fig, axs = plt.subplots(1, 3, figsize=(45, 15), constrained_layout=True)
+fig, axs = plt.subplots(1, 3, figsize=(15, 15), constrained_layout=True)
 axs = axs.flatten()  # Flatten to easily iterate
 
 node_labels = {0: 'A', 1: 'B', 2: 'A', 3: 'C', 4: 'D', 5: 'E', 6: 'F'}
@@ -99,26 +99,28 @@ for i, dataset_name in enumerate(datasets):
 
     # Perform community detection using the Louvain method
     partition = community_louvain.best_partition(G)
-    cmap = plt.cm.get_cmap('plasma', max(partition.values()) + 1)
+    #cmap = plt.cm.get_cmap('plasma', max(partition.values()) + 1)
+    cmap = plt.cm.get_cmap('hsv', 6)
 
     for community in set(partition.values()):
         list_nodes = [nodes for nodes in partition.keys() if partition[nodes] == community]
-        nx.draw_networkx_nodes(G, layout, list_nodes, node_size=100, node_color=[cmap(community)], ax=axs[i], alpha=0.3)
+        nx.draw_networkx_nodes(G, layout, list_nodes, node_size=10, edgecolors='grey', node_color=[cmap(community)], ax=axs[i], alpha=0.7)
         #nx.draw_networkx_edges(G, layout, alpha=0.5)
 
     nx.draw_networkx_edges(G, layout, ax=axs[i], alpha=0.5)
     #nx.draw_networkx_labels(G, layout, ax=axs[i])
 
-    axs[i].set_title(dataset_name, fontsize=60)
+    axs[i].set_title(dataset_name, fontsize=30)
 
     #plt.tight_layout()
 
     #axs[i].imshow(adj_matrix_dense, cmap="Blues", interpolation="nearest")
 plt.subplots_adjust(wspace=0, hspace=0)
 #plt.colorbar()
-plt.savefig('plotCluster.eps',format='eps', dpi=300)
-plt.savefig('plotCluster.pdf',format='pdf', dpi=300)
-plt.savefig('plotCluster.png',format='png', dpi=300)
+plt.axis('off')
+# plt.savefig('plotCluster.eps',format='eps', dpi=300)
+# plt.savefig('plotCluster.pdf',format='pdf', dpi=300)
+# plt.savefig('plotCluster.png',format='png', dpi=300)
 plt.show()
 
 

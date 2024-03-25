@@ -3,14 +3,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import community as community_louvain
 import numpy as np
 import networkx as nx
 import torch_geometric.datasets as pyg_datasets
 import matplotlib.pyplot as plt
 from torch_geometric.utils import *
 from process import full_load_data
-import community as community_louvain
 
 import numpy as np
 import scipy.sparse as sp
