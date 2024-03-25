@@ -1005,7 +1005,7 @@ class GGCN(nn.Module):
             sorteddict = dict(sorted(self.htidict.items(), key=lambda item: item[1]))
             for nodekey in sorteddict:
                 #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
-                tes = calc_te_for_node(nodekey, adj, layer_inner, 5)
+                tes = calc_te_for_node(nodekey, adj, layer_inner, 1)
                 if tes is not None and len(tes) > 0:
                     #allsum += np.max(tes)
                     if np.max(tes) > maxte:

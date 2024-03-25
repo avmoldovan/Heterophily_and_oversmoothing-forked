@@ -251,7 +251,11 @@ def train(datastr,splitstr):
         use_decay = args.no_decay
         use_bn = (args.use_bn) & (not use_decay)
         use_ln = (args.use_ln) & (not use_decay) & (not use_bn)
-        model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln, neptune_inst=run).to(device)
+
+        if (args.neptune):
+            model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln, neptune_inst=run).to(device)
+        else:
+            model = GGCN(nfeat=features.shape[1], nlayers=args.layer, nhidden=args.hidden, nclass=num_labels, dropout=args.dropout, decay_rate=args.decay_rate, exponent=args.exponent, use_degree=use_degree, use_sign=use_sign, use_decay=use_decay, use_sparse=args.use_sparse, scale_init=args.scale_init, deg_intercept_init=args.deg_intercept_init, use_bn=use_bn, use_ln=use_ln, neptune_inst=None).to(device)
 
         if (args.neptune):
             run["config/model"] = type(model).__name__
