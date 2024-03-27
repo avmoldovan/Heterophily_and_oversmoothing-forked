@@ -1002,10 +1002,10 @@ class GGCN(nn.Module):
             allabssum = 0.
             maxabste = 0.
             maxte = 0.
-            sorteddict = dict(sorted(self.htidict.items(), key=lambda item: item[1]))
+            sorteddict = sorted(self.htidict.items(), key=lambda item: item[1])[0:(int(adj.size()[0] / 20))]
             for nodekey in sorteddict:
                 #layer_previous[i] -= (1. - np.sum(calc_te_for_node(i, adj, layer_previous)))
-                tes = calc_te_for_node(nodekey, adj, layer_inner, 1)
+                tes = calc_te_for_node(nodekey[0], adj, layer_inner, 1)
                 if tes is not None and len(tes) > 0:
                     #allsum += np.max(tes)
                     if np.max(tes) > maxte:
@@ -1014,9 +1014,9 @@ class GGCN(nn.Module):
                     if np.max(np.abs(tes)) > maxabste:
                         maxabste = np.max(np.abs(tes))
                         allabssum += maxabste
-                    layer_inner[nodekey] += maxte
+                    layer_inner[nodekey[0]] += maxte
                 i = i + 1
-                if i > adj.size()[0] / 20:
+                if i > adj.size()[0] / 10:
                     break
             # #     if max_tes is not None:
             # #         dd = torch.diag(torch.tensor(max_tes))
@@ -1026,9 +1026,9 @@ class GGCN(nn.Module):
                 self.run["training/maxabste"].log(np.abs(maxabste))
 
                 htivalstensor = torch.tensor([x for x in dict(htidict).values()])
-                self.run["training/maxhti"].log(htivalstensor.max())
-                self.run["training/meanhti"].log(htivalstensor.mean())
-                self.run["training/medianhti"].log(htivalstensor.median())
+                self.run["training/maxhti"].log(htivalstensor.max().item())
+                self.run["training/meanhti"].log(htivalstensor.mean().item())
+                self.run["training/medianhti"].log(htivalstensor.median().item())
             #Wh = Wh + allsum
 
         # degrees = adj.sum(dim=1)

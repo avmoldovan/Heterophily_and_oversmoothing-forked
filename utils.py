@@ -43,16 +43,17 @@ def calculate_node_homophily_index_sparse(sparse_adj, strided_adj, labels, idx_t
     #deg = degree(adj._indices()[0], num_nodes=labels.size(0))
     _, nodes = torch.topk(deg, int(strided_adj.size(0)), largest=True)
     node_hi = torch.zeros(labels.size(0))
-    htis = OrderedDict()
+    htis = dict()
     with torch.no_grad():
         for node in nodes:
             # Find nodes connected to the current top node
             #neighbors = ((strided_adj.to_dense())[node] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-            neighbors = sparse_adj[node]
+            #neighbors = sparse_adj[node].to_dense().to('cpu').to(torch.int64)
+            neighbors = torch.where(strided_adj[node] != 0)[0].to('cpu')
 
             if neighbors.size(0) > 0:
                 # Calculate the homophily index as the fraction of neighbors with the same label
-                same_label = labels[neighbors.to_dense().to('cpu').to(torch.int64)] == labels[node]
+                same_label = labels[neighbors] == labels[node]
                 htival = same_label.float().sum() / deg[node]
                 node_hi[node.item()] = 1. - htival
                 htis [node.item()] = 1. - htival
@@ -106,8 +107,8 @@ def calc_te_for_node(node_index, adj, e, nclass):
     with torch.no_grad():
         #for node in nodes:
         # Find nodes connected to the current top node
-        connected_nodes = ((adj.to_dense())[node_index] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
-        if connected_nodes.size > 1:
+        connected_nodes = (torch.where(adj[node_index] != 0)[0]).to('cpu').numpy()#((adj.to_dense())[node_index] > 0).nonzero(as_tuple=False).squeeze().detach().cpu().numpy()
+        if connected_nodes.size> 1:
             for cn in connected_nodes:
                 # xi_detached = x_i.t().detach().cpu().numpy()
                 # for i, xi in enumerate(xi_detached):
